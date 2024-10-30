@@ -20,19 +20,124 @@ include-before-body:
 **PS4:** Due Sat Nov 2 at 5:00PM Central. Worth 100 points. 
 
 ## Style Points (10 pts)
-
 ## Submission Steps (10 pts)
-
 ## Download and explore the Provider of Services (POS) file (10 pts)
 
-1. 
+1. What are the Variables I pulled? 
+```{python}
+import pandas as pd 
+import altair as alt
+import os
+```
+
+```{python}
+# Reading dataset
+path = "/Users/tsaili-ting/Uchicago/Year2/Y2Fall/Python2/problem-set-4-gena-ting/"
+
+path_2016 = os.path.join(path, "pos2016.csv")
+pos2016 = pd.read_csv(path_2016)
+
+#variable pull 
+
+pos2016.columns
+```
+
+1. Provider Category
+2. Provider Category sub
+3. City
+4. Hospital Name
+5. CMS Number
+6. Termination code
+7. Termination or Expiration Date
+8. ZIP code
+
 2. 
-    a.
-    b.
-3. 
+    a. How many hospitals are reported in this data? 
+```{python}
+pos2016_s = pos2016.loc[(pos2016["PRVDR_CTGRY_CD"]==1)&(pos2016["PRVDR_CTGRY_SBTYP_CD"]==1)]
+
+len(pos2016_s)
+```
+
+    The number of short-term hospital in the dataset is 7245.
+    
+    b.Does this number make sense? Cross-reference with other sources and cite the numberyou compared it to.
+
+     However, according to American Hospital Association(https://www.aha.org/statistics/fast-facts-us-hospitals), there are only 5129 community hospital. Citing that "Excluded are hospitals not accessible by the general public, such as prison hospitals or college infirmaries." in AHA's number. 
+    
+3. Plot the number of observations in your dataset by year.
+```{python}
+# Read 2017,18,19 dataset 
+path_2017 = os.path.join(path, "pos2017.csv")
+path_2018 = os.path.join(path, "pos2018.csv")
+path_2019 = os.path.join(path, "pos2019.csv")
+
+pos2017 = pd.read_csv(path_2017)
+pos2018 = pd.read_csv(path_2018,encoding="latin1")
+pos2019 = pd.read_csv(path_2019,encoding="latin1")
+
+```
+
+```{python}
+# filter only short term hospital 
+pos2017_s = pos2017.loc[(pos2017["PRVDR_CTGRY_CD"]==1)&(pos2017["PRVDR_CTGRY_SBTYP_CD"]==1)]
+pos2018_s = pos2018.loc[(pos2018["PRVDR_CTGRY_CD"]==1)&(pos2018["PRVDR_CTGRY_SBTYP_CD"]==1)]
+pos2019_s = pos2019.loc[(pos2019["PRVDR_CTGRY_CD"]==1)&(pos2019["PRVDR_CTGRY_SBTYP_CD"]==1)]
+
+```
+
+```{python}
+# Add a column represent the fisical year, and append data
+
+pos2016_s["Year"] = "2016"
+pos2017_s["Year"] = "2017"
+pos2018_s["Year"] = "2018"
+pos2019_s["Year"] = "2019"
+
+# Append the dataset
+pos_combine = pd.concat([pos2016_s, pos2017_s, pos2018_s, pos2019_s], ignore_index=True)
+```
+
+```{python}
+# plot the observations by year
+alt.data_transformers.disable_max_rows()
+alt.Chart(pos_combine).mark_bar().encode(
+    x=alt.X('Year:N',  
+            title="Year"),
+    y=alt.Y('count()', title="Number of Observation",scale=alt.Scale(domain=[7000, 7500]))
+).properties( title='Number of Observations over Year')
+```
+
 4. 
-    a.
-    b.
+    a. Plot the number of unique hospitals in your dataset per year.
+
+```{python}
+# aggregate by year and calculate the unique number 
+unique_hospital = pos_combine.groupby('Year')['PRVDR_NUM'].nunique().reset_index()
+```
+```{python}
+
+alt.Chart(unique_hospital).mark_bar().encode(
+    x=alt.X('Year:N', title="Year"),
+    y=alt.Y('PRVDR_NUM:Q', title="Number of Unique Observations")
+    ).properties(
+    title='Number of Observations over Year'
+)
+```
+
+b. Compare this to your plot in the previous step. What does this tell you about the structure of the data?
+
+Look at the two graph they are identical, but we can also check the exact number of each year. 
+
+```{python}
+pos_combine.groupby("Year").agg(NumberOfHospital = ("Year","count")).reset_index()
+```
+
+```{python}
+unique_hospital
+```
+
+They are exactly the same number, meaning each row is a unique hospital. 
 
 ## Identify hospital closures in POS file (15 pts) (*)
 
