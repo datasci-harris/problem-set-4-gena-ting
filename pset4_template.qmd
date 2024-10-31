@@ -32,7 +32,7 @@ import os
 
 ```{python}
 # Reading dataset
-path = "/Users/tsaili-ting/Uchicago/Year2/Y2Fall/Python2/problem-set-4-gena-ting/"
+path = "C:\Users\madig\Documents\Github\Year 2024-2025\problem-set-4-gena-ting"
 
 path_2016 = os.path.join(path, "pos2016.csv")
 pos2016 = pd.read_csv(path_2016)
