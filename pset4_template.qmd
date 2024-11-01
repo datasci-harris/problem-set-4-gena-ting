@@ -28,6 +28,7 @@ include-before-body:
 import pandas as pd 
 import altair as alt
 import os
+import geopandas as gpd
 ```
 
 ```{python}
@@ -152,8 +153,61 @@ They are exactly the same number, meaning each row is a unique hospital.
 
 1. 
     a.
-    b. 
+    - gz_2010_us_860_00_500k.dbf: It's an Attribute Table. This file contains attribute data for each shape (e.g., names, population, or other data related to each spatial feature). It’s essentially a database in a table format and is essential for linking spatial features to their descriptive information.    
+
+    - gz_2010_us_860_00_500k.shp: It's a Shapefile. It contains the geometry data or spatial information. such as the points, lines, or polygons that make up the shape of each feature in the dataset. 
+
+    - gz_2010_us_860_00_500k.xml: It's a Metadata File. This file includes metadata, such as a description of the data, its source, creation date, and other details about the dataset. 
+
+    - gz_2010_us_860_00_500k.prj: It's a Projection File. This file holds information about the coordinate system and projection. It ensures that the shapefile aligns properly on a map with other spatial data.      
+
+    - gz_2010_us_860_00_500k.shx: It's a Shape Index File. This index file is used to facilitate quick access to the geometries in the .shp file. It provides the spatial index of the geometry, helping software read specific features quickly without searching through the entire .shp file.
+
+    b.  
+    - gz_2010_us_860_00_500k.dbf: 6.4MB      
+    - gz_2010_us_860_00_500k.shp: 837.5MB      
+    - gz_2010_us_860_00_500k.xml: 16KM
+    - gz_2010_us_860_00_500k.prj: 165bytes      
+    - gz_2010_us_860_00_500k.shx: 265KB
 2. 
+
+```{python}
+# read the shapefile 
+filepath = "/Users/tsaili-ting/Uchicago/Year2/Y2Fall/Python2/problem-set-4-gena-ting/gz_2010_us_860_00_500k"
+data = gpd.read_file(filepath)
+type(data)
+```
+
+```{python}
+# select Texas zip code, import pandas as pd
+data['ZCTA5'] = data['ZCTA5'].astype(int)
+
+# Filter Texas ZIP code range (73301 - 88595)
+texas_shp = data[(data['ZCTA5'] >= 73301) & (data['ZCTA5'] <= 88595)]
+```
+
+```{python}
+# calculate number of zip code under each zip code
+pos2016_count = pos2016_s.groupby("ZIP_CD").agg(count = ("FAC_NAME","count")).reset_index()
+
+# filter Texas
+pos2016_count_tx = pos2016_count[(pos2016_count['ZIP_CD'] >= 73301) & (pos2016_count['ZIP_CD'] <= 88595)].reset_index()
+
+```
+
+```{python}
+# merge shape and hospital by zip code
+
+texas_merged = texas_shp.merge(pos2016_count_tx, left_on='ZCTA5', right_on='ZIP_CD', how='left')
+
+texas_merged['count'] = texas_merged['count'].fillna(0)
+texas_merged = texas_merged.drop(columns=['ZIP_CD', 'index'])
+```
+
+```{python}
+# create choropleth of the number of hospitals by zip code in Texas
+texas_merged.plot(column="count", cmap = "Blues",legend=True).set_axis_off()
+```
 
 ## Calculate zip code’s distance to the nearest hospital (20 pts) (*)
 
