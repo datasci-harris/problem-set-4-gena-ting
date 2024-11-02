@@ -329,9 +329,92 @@ print(sorted_filtered_closures[['FAC_NAME', 'ZIP_CD', 'Year_Closed']])
 
 ## Calculate zip code’s distance to the nearest hospital (20 pts) (*)
 
+```{python}
+import zipfile
+
+# Set the path to the ZIP file and the output directory
+zip_path = "C:\\Users\\madig\\Documents\\Github\\Year 2024-2025\\problem-set-4-gena-ting\\gz_2010_us_860_00_500k.zip"
+extract_path = "C:\\Users\\madig\\Documents\\Github\\Year 2024-2025\\problem-set-4-gena-ting"
+
+# Unzip the file
+with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+    zip_ref.extractall(extract_path)
+
+print("Shapefile unzipped successfully!")
+```
+
+
+
+
 1. 
+```{python}
+import geopandas as gpd
+
+# Set the path to the national shapefile and rename as filepath2
+filepath2 = "C:\\Users\\madig\\Documents\\Github\\Year 2024-2025\\problem-set-4-gena-ting\\gz_2010_us_860_00_500k.shp"
+
+zips_all = gpd.read_file(filepath2)
+
+# Calculate centroids for each ZIP code
+zips_all_centroids = zips_all.copy()
+zips_all_centroids['geometry'] = zips_all_centroids.centroid
+
+# Check the dimensions and column information
+print("Dimensions of zips_all_centroids:", zips_all_centroids.shape)
+print("Columns and first few rows of zips_all_centroids:")
+print(zips_all_centroids.head())
+
+```
+
+
+The resulting GeoDataFrame, zips_all_centroids, has dimensions of (number of rows, number of columns), 
+where each row represents a ZIP Code Tabulation Area (ZCTA) centroid in the U.S. Based on the data, it likely has
+rows for each ZIP code centroid in the dataset (e.g., thousands of rows) and six columns as shown in the data.
+
+Columns:
+
+GEO_ID: A unique geographic identifier for each ZCTA.
+ZCTA5: The 5-digit ZIP code.
+NAME: The ZIP codes name, identical to ZCTA5.
+LSAD: Legal/Statistical Area Description, indicating that each row represents a "ZCTA5" (5-digit ZIP Code Tabulation Area).
+CENSUSAREA: The land area of each ZCTA in square miles.
+geometry: A Point geometry representing the centroid location of each ZIP code area, with coordinates in latitude and longitude.
+
+
 2. 
+
+```{python}
+
+# Define the Texas and New Mexico ZIP code ranges
+texas_prefixes = list(range(75001, 80000)) + [73301]  # Texas ZIP code range
+new_mexico_prefixes = range(87001, 88500)  # New Mexico ZIP code range
+
+# Filter for Texas ZIP codes
+zips_texas_centroids = zips_all_centroids[zips_all_centroids['ZCTA5'].astype(int).isin(texas_prefixes)]
+
+# Filter for New Mexico ZIP codes
+zips_new_mexico_centroids = zips_all_centroids[zips_all_centroids['ZCTA5'].astype(int).isin(new_mexico_prefixes)]
+
+# Count unique ZIP codes in each subset
+texas_unique_zips = zips_texas_centroids['ZCTA5'].nunique()
+new_mexico_unique_zips = zips_new_mexico_centroids['ZCTA5'].nunique()
+
+print(f"Number of unique ZIP codes in Texas: {texas_unique_zips}")
+print(f"Number of unique ZIP codes in New Mexico: {new_mexico_unique_zips}")
+
+```
+
+Number of unique ZIP codes in Texas: 1935
+Number of unique ZIP codes in New Mexico: 368
+
 3. 
+
+```{python}
+
+
+```
+
+
 4. 
     a.
     b.
