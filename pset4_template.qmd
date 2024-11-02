@@ -32,7 +32,7 @@ import os
 
 ```{python}
 # Reading dataset
-path = "C:\Users\madig\Documents\Github\Year 2024-2025\problem-set-4-gena-ting"
+path = "/Users/madig/Documents/Github/Year 2024-2025/problem-set-4-gena-ting/"
 
 path_2016 = os.path.join(path, "pos2016.csv")
 pos2016 = pd.read_csv(path_2016)
@@ -142,11 +142,183 @@ They are exactly the same number, meaning each row is a unique hospital.
 ## Identify hospital closures in POS file (15 pts) (*)
 
 1. 
+```{python}
+
+years = ["2016", "2017", "2018", "2019"]
+
+# Load data for each year and filter for short-term hospitals
+data = {}
+for year in years:
+    file_path = os.path.join(path, f"pos{year}.csv")
+    # Specify encoding
+    df = pd.read_csv(file_path, encoding='ISO-8859-1')
+    data[year] = df[(df["PRVDR_CTGRY_CD"] == 1) & (df["PRVDR_CTGRY_SBTYP_CD"] == 1)]
+
+# Identify closures
+closures = []
+for i, year in enumerate(years[:-1]):
+    current_year_data = data[year]
+    next_year_data = data[years[i + 1]]
+    
+    # Merge to check if hospitals from the current year exist in the next year
+    merged_data = current_year_data.merge(
+        next_year_data[['PRVDR_NUM']],
+        on='PRVDR_NUM',
+        how='left',
+        indicator=True
+    )
+    
+    # Filter for hospitals that do not appear in the next year's data or have a termination date
+    closed_hospitals = merged_data[
+        (merged_data['_merge'] == 'left_only') |
+        (merged_data['TRMNTN_EXPRTN_DT'].notna())
+    ]
+    
+    # Store closures with hospital name, zip, and year of closure
+    closures.extend(
+        closed_hospitals[['FAC_NAME', 'ZIP_CD', 'PRVDR_NUM']].assign(Year_Closed=years[i + 1]).to_dict('records')
+    )
+
+# Convert closures to DataFrame for easy viewing
+closures_df = pd.DataFrame(closures)
+print(f"Total suspected closures: {len(closures_df)}")
+print(closures_df)
+
+```
+
+The total suspected closure amount is 11606 hospitals.
 2. 
+```{python}
+# Sort closures_df by facility name and select the first 10 rows
+sorted_closures = closures_df.sort_values(by='FAC_NAME').head(10)
+
+# Display the facility names and years of suspected closure for the first 10 rows
+sorted_closures[['FAC_NAME', 'Year_Closed']]
+
+# Display facility names and years of suspected closure for the first 10 sorted rows
+print(sorted_closures[['FAC_NAME', 'Year_Closed']])
+
+```
+
+                                            FAC_NAME Year_Closed
+3002     (CLOSED) BAPTIST HICKMAN COMMUNITY HOSPITAL        2017
+6849     (CLOSED) BAPTIST HICKMAN COMMUNITY HOSPITAL        2018
+10756    (CLOSED) BAPTIST HICKMAN COMMUNITY HOSPITAL        2019
+6927             (CLOSED) BAPTIST HOSPITAL FOR WOMEN        2018
+10838            (CLOSED) BAPTIST HOSPITAL FOR WOMEN        2019
+6851       (CLOSED) BAPTIST HOSPITAL OF ROANE COUNTY        2018
+3004       (CLOSED) BAPTIST HOSPITAL OF ROANE COUNTY        2017
+10758      (CLOSED) BAPTIST HOSPITAL OF ROANE COUNTY        2019
+3030   (CLOSED) BAPTIST MEMORIAL HOSPITAL LAUDERDALE        2017
+6877   (CLOSED) BAPTIST MEMORIAL HOSPITAL LAUDERDALE        2018
+
+
 3. 
     a.
+```{python}
+# Step 1: Count active hospitals by ZIP code for each year
+active_hospitals_by_zip = {}
+for year, df in data.items():
+    # Filter active hospitals (no termination date) and count by ZIP code
+    active_by_zip = df[df['TRMNTN_EXPRTN_DT'].isna()].groupby('ZIP_CD')['PRVDR_NUM'].count()
+    active_hospitals_by_zip[year] = active_by_zip
+
+# Step 2: Identify potential mergers/acquisitions
+potential_mergers = []
+for _, row in closures_df.iterrows():
+    zip_code = row['ZIP_CD']
+    closure_year = row['Year_Closed']
+    
+    # Convert closure_year to string to match dictionary keys
+    closure_year_str = str(closure_year)
+    next_year_str = str(int(closure_year) + 1)
+    
+    # Check if we have counts for both the closure year and the following year
+    if closure_year_str in active_hospitals_by_zip and next_year_str in active_hospitals_by_zip:
+        # Compare hospital counts in the ZIP code for closure year and the next year
+        current_count = active_hospitals_by_zip[closure_year_str].get(zip_code, 0)
+        next_count = active_hospitals_by_zip[next_year_str].get(zip_code, 0)
+        
+        # If the number of hospitals does not decrease, it may indicate a merger/acquisition
+        if current_count == next_count:
+            potential_mergers.append(row)
+
+# Convert potential mergers to DataFrame
+potential_mergers_df = pd.DataFrame(potential_mergers)
+
+# Output the number of potential mergers/acquisitions
+print(f"Number of suspected closures that may be mergers/acquisitions: {len(potential_mergers_df)}")
+print(potential_mergers_df[['FAC_NAME', 'ZIP_CD', 'Year_Closed']])
+
+```
+
+Number of suspected closures that may be mergers/acquisitions: 7625
     b.
+```{python}
+# Step 1: Count active hospitals by ZIP code for each year
+active_hospitals_by_zip = {}
+for year, df in data.items():
+    # Filter active hospitals (no termination date) and count by ZIP code
+    active_by_zip = df[df['TRMNTN_EXPRTN_DT'].isna()].groupby('ZIP_CD')['PRVDR_NUM'].count()
+    active_hospitals_by_zip[year] = active_by_zip
+
+# Step 2: Filter closures based on active hospital count in ZIP code
+filtered_closures = []
+for _, row in closures_df.iterrows():
+    zip_code = row['ZIP_CD']
+    closure_year = row['Year_Closed']
+    
+    # Convert closure_year to string to match dictionary keys
+    closure_year_str = str(closure_year)
+    next_year_str = str(int(closure_year) + 1)
+    
+    # Check if we have counts for both the closure year and the following year
+    if closure_year_str in active_hospitals_by_zip and next_year_str in active_hospitals_by_zip:
+        # Compare hospital counts in the ZIP code for closure year and the next year
+        current_count = active_hospitals_by_zip[closure_year_str].get(zip_code, 0)
+        next_count = active_hospitals_by_zip[next_year_str].get(zip_code, 0)
+        
+        # Keep only if active hospitals decrease in the following year
+        if current_count > next_count:
+            filtered_closures.append(row)
+
+# Convert filtered closures to DataFrame
+filtered_closures_df = pd.DataFrame(filtered_closures)
+
+# Display the filtered list of suspected closures
+print(f"Total filtered suspected closures: {len(filtered_closures_df)}")
+print(filtered_closures_df[['FAC_NAME', 'ZIP_CD', 'Year_Closed']])
+
+
+```
+
+
+Total filtered suspected closures: 42
+
     c.
+```{python}
+
+# Sort the filtered closures by hospital name
+sorted_filtered_closures = filtered_closures_df.sort_values(by='FAC_NAME').head(10)
+
+# Display the first 10 rows of the sorted list
+print(sorted_filtered_closures[['FAC_NAME', 'ZIP_CD', 'Year_Closed']])
+
+
+```
+
+                                FAC_NAME   ZIP_CD Year_Closed
+3044                   (CLOSED) TRINITY HOSPITAL  37061.0        2017
+2523  AFFINITY MEDICAL CENTER - MASSILLON CAMPUS  44646.0        2017
+6528              AMERICAN TRANSITIONAL HOSPITAL  73112.0        2018
+1340                      BOSSIER MEDICAL CENTER  71111.0        2017
+1434                  BOSSIER SPECIALTY HOSPITAL  71111.0        2017
+7253                      CENTRAL TEXAS HOSPITAL  76520.0        2018
+2678                      CITY OF FAITH HOSPITAL  74137.0        2017
+2172   CONTINUECARE HOSPITAL OF CARSON TAHOE INC  89703.0        2017
+6992            DALLAS/FORT WORTH MEDICAL CENTER  75051.0        2018
+7651                       EL PASO LTAC HOSPITAL  79902.0        2018
+
 
 ## Download Census zip code shapefile (10 pt) 
 
@@ -163,7 +335,6 @@ They are exactly the same number, meaning each row is a unique hospital.
 4. 
     a.
     b.
-    c.
 5. 
     a.
     b.
