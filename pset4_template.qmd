@@ -26,6 +26,7 @@ Please refer to the minilesson on code style
 **[here](https://uchicago.zoom.us/rec/share/pG_wQ-pHTQrJTmqNn4rcrw5V194M2H2s-2jdy8oVhWHkd_yZt9o162IWurpA-fxU.BIQlSgZLRYctvzp-)**.
 
 ## Submission Steps (10 pts)
+
 1. This problem set is a paired problem set.
 2. Play paper, scissors, rock to determine who goes first. Call that person *Partner 1*.
     - Partner 1 (name and cnet ID):
@@ -42,6 +43,7 @@ Please refer to the minilesson on code style
 
 **Important:** Repositories are for tracking code. **Do not commit the data or shapefiles to your repo.** The best way to do this is with `.gitignore`, which we have covered in class. If you do accidentally commit the data, Github has a [guide](https://docs.github.com/en/repositories/working-with-files/managing-large-files/about-large-files-on-github#removing-files-from-a-repositorys-history). The best course of action depends on whether you have pushed yet. This also means that both partners will have to download the initial raw data and any data cleaning code will need to be re-run on both partners' computers. 
 
+
 ## Download and explore the Provider of Services (POS) file (10 pts)
 
 1. What are the Variables I pulled? 
@@ -49,6 +51,8 @@ Please refer to the minilesson on code style
 import pandas as pd 
 import altair as alt
 import os
+import geopandas as gpd
+
 ```
 
 ```{python}
@@ -339,8 +343,61 @@ print(sorted_filtered_closures[['FAC_NAME', 'ZIP_CD', 'Year_Closed']])
 
 1. 
     a.
-    b. 
+    - gz_2010_us_860_00_500k.dbf: It's an Attribute Table. This file contains attribute data for each shape (e.g., names, population, or other data related to each spatial feature). It’s essentially a database in a table format and is essential for linking spatial features to their descriptive information.    
+
+    - gz_2010_us_860_00_500k.shp: It's a Shapefile. It contains the geometry data or spatial information. such as the points, lines, or polygons that make up the shape of each feature in the dataset. 
+
+    - gz_2010_us_860_00_500k.xml: It's a Metadata File. This file includes metadata, such as a description of the data, its source, creation date, and other details about the dataset. 
+
+    - gz_2010_us_860_00_500k.prj: It's a Projection File. This file holds information about the coordinate system and projection. It ensures that the shapefile aligns properly on a map with other spatial data.      
+
+    - gz_2010_us_860_00_500k.shx: It's a Shape Index File. This index file is used to facilitate quick access to the geometries in the .shp file. It provides the spatial index of the geometry, helping software read specific features quickly without searching through the entire .shp file.
+
+    b.  
+    - gz_2010_us_860_00_500k.dbf: 6.4MB      
+    - gz_2010_us_860_00_500k.shp: 837.5MB      
+    - gz_2010_us_860_00_500k.xml: 16KM
+    - gz_2010_us_860_00_500k.prj: 165bytes      
+    - gz_2010_us_860_00_500k.shx: 265KB
 2. 
+
+```{python}
+# read the shapefile 
+filepath = "/Users/tsaili-ting/Uchicago/Year2/Y2Fall/Python2/problem-set-4-gena-ting/gz_2010_us_860_00_500k"
+data = gpd.read_file(filepath)
+type(data)
+```
+
+```{python}
+# select Texas zip code, import pandas as pd
+data['ZCTA5'] = data['ZCTA5'].astype(int)
+
+# Filter Texas ZIP code range (73301 - 88595)
+texas_shp = data[((data['ZCTA5'] >= 75000) & (data['ZCTA5'] <= 80000)) | (data['ZCTA5'] == 73301)]
+```
+
+```{python}
+# calculate number of hospital under each zip code in 2016
+pos2016_count = pos2016_s.groupby("ZIP_CD").agg(count = ("FAC_NAME","count")).reset_index()
+
+# filter Texas
+pos2016_count_tx = pos2016_count[(pos2016_count['ZIP_CD'] >= 73301) & (pos2016_count['ZIP_CD'] <= 88595)].reset_index()
+
+```
+
+```{python}
+# merge shape and hospital by zip code
+
+texas_merged = texas_shp.merge(pos2016_count_tx, left_on='ZCTA5', right_on='ZIP_CD', how='left')
+
+texas_merged['count'] = texas_merged['count'].fillna(0)
+texas_merged = texas_merged.drop(columns=['ZIP_CD', 'index'])
+```
+
+```{python}
+# create choropleth of the number of hospitals by zip code in Texas
+texas_merged.plot(column="count", cmap = "Blues",legend=True).set_axis_off()
+```
 
 ## Calculate zip code’s distance to the nearest hospital (20 pts) (*)
 
@@ -495,6 +552,7 @@ Estimated time for entire join: 47.69 seconds
     b.
 
 
+
 ```{python}
 
 zips_texas_centroids = zips_texas_centroids.to_crs(epsg=3857)
@@ -634,15 +692,123 @@ plt.show()
     
 ## Effects of closures on access in Texas (15 pts)
 
-1. 
+1.
+
+```{python}
+# filter data to Texas
+texas_combine = pos_combine[((pos_combine["ZIP_CD"] >= 75001) & (pos_combine["ZIP_CD"] <= 80000)) | (pos_combine["ZIP_CD"] == 73301)]
+
+# find out closure in each year 
+texas_closure = texas_combine.groupby(["ZIP_CD", "Year"]).agg(
+     number_of_closure=("TRMNTN_EXPRTN_DT", lambda x: (x > 20160000).sum())
+     ).reset_index()
+
+# make zip a nuique row 
+texas_closure = texas_closure.pivot_table(index = "ZIP_CD",columns = "Year", values = "number_of_closure").reset_index().fillna(0)
+
+```
+
+```{python}
+# filter the number of closure > 0
+texas_closure = texas_closure[
+    (texas_closure["2016"] != 0) | 
+    (texas_closure["2017"] != 0) | 
+    (texas_closure["2018"] != 0) | 
+    (texas_closure["2019"] != 0)].reset_index()
+
+texas_closure
+
+```
+
 2. 
-3. 
-4. 
+
+```{python}
+# merge shape and number of closure hospital by zip code
+
+texas_closure_merged = texas_shp.merge(texas_closure, left_on='ZCTA5', right_on='ZIP_CD', how='left')
+texas_closure_merged["2019"] = texas_closure_merged["2019"].fillna(0)
+```
+
+```{python}
+# create choropleth of the number of hospitals by zip code in Texas
+texas_closure_merged.plot(column="2019", cmap = "Blues",legend=True).set_axis_off()
+
+```
+
+```{python}
+len(texas_closure)
+```
+
+There are 27 zip code in Texas that at least has one closure during 2016-2019. 
+
+
+3. (Partner 1) Then identify all the indirectly affected zip codes: Texas zip codes within a
+10-mile radius of the directly affected zip codes. To do so, first create a GeoDataFrame
+of the directly affected zip codes. Then create a 10-mile buffer around them. Then, do
+a spatial join with the overall Texas zip code shapefile. How many indirectly affected
+zip codes are there in Texas?
+
+
+```{python}
+# filter direct zip code
+texas_direct = texas_closure_merged[texas_closure_merged["2019"] > 0].copy()
+texas_direct.plot().set_axis_off()
+```
+
+```{python}
+# create buffer
+texas_buffer = texas_direct.copy()
+texas_buffer['geometry'] = texas_buffer.geometry.buffer(0.145)
+texas_buffer.plot(color="red", alpha=0.5).set_axis_off()
+```
+
+```{python}
+# spatial join back to texas_closure 
+texas_indirect = gpd.sjoin(texas_shp, texas_buffer, how="inner", predicate="intersects")
+texas_indirect.plot(color="blue", alpha=0.3).set_axis_off()
+```
+
+```{python}
+len(texas_indirect)
+```
+
+There are 795 zip code in Texas that is within 10 miles buffer, has indirect effect from hospital closure
+
+4.  (Partner 1) Make a choropleth plot of the Texas zip codes with a different color for
+each of the 3 categories: directly affected by a closure, within 10 miles of closure but
+not directly affected, or not affected.
+
+```{python}
+# find out unaffect zip code
+affected_zip_codes = set(texas_direct['ZIP_CD']).union(set(texas_indirect['ZIP_CD']))
+texas_unaffected = texas_shp[~texas_shp['ZCTA5'].isin(affected_zip_codes)]
+texas_unaffected.plot(color="green", alpha=0.3).set_axis_off()
+
+```
+```{python}
+import matplotlib.pyplot as plt
+
+fig, ax = plt.subplots()
+texas_unaffected.plot(ax=ax, color="green", alpha=0.3)
+texas_indirect.plot(ax=ax, color="blue", alpha=0.3)
+texas_direct.plot(ax=ax, color="red", alpha=0.5)
+
+ax.set_axis_off()
+plt.show()
+
+ax.set_axis_off()
+plt.show()
+```
+
 
 ## Reflecting on the exercise (10 pts) 
 1.
 
-2. Consider the way we are identifying zip codes affected by closures. How
+	Currently, we identify real closures by comparing the number of active hospitals. However, this approach has a potential issue: we might mistakenly identify a genuine closure as a merger if the total number remains unchanged. This could lead to misclassifying a true closure as a merger.
+
+	To improve this method, we could add a classification for operational closures. Instead of simply labeling them as “terminated,” an additional column indicating operational closure status would make it easier to verify the true nature of each hospital’s closure.
+
+2. Consider the way we are identifying zip codes affected by closures.
 
 
 The current method of identifying affected ZIP codes based on closures captures a basic 
