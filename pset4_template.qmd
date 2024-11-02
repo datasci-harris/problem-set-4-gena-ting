@@ -385,43 +385,260 @@ geometry: A Point geometry representing the centroid location of each ZIP code a
 
 ```{python}
 
-# Define the Texas and New Mexico ZIP code ranges
+import geopandas as gpd
+
+# Define ZIP code ranges for each state
 texas_prefixes = list(range(75001, 80000)) + [73301]  # Texas ZIP code range
-new_mexico_prefixes = range(87001, 88500)  # New Mexico ZIP code range
+new_mexico_prefixes = range(87001, 88500)             # New Mexico ZIP code range
+oklahoma_prefixes = range(73001, 74900)               # Oklahoma ZIP code range
+arkansas_prefixes = range(71601, 72900)               # Arkansas ZIP code range
+louisiana_prefixes = range(70001, 71500)              # Louisiana ZIP code range
 
 # Filter for Texas ZIP codes
 zips_texas_centroids = zips_all_centroids[zips_all_centroids['ZCTA5'].astype(int).isin(texas_prefixes)]
 
-# Filter for New Mexico ZIP codes
-zips_new_mexico_centroids = zips_all_centroids[zips_all_centroids['ZCTA5'].astype(int).isin(new_mexico_prefixes)]
+# Filter for Texas and bordering states ZIP codes
+zips_texas_borderstates_centroids = zips_all_centroids[
+    zips_all_centroids['ZCTA5'].astype(int).isin(texas_prefixes) |
+    zips_all_centroids['ZCTA5'].astype(int).isin(new_mexico_prefixes) |
+    zips_all_centroids['ZCTA5'].astype(int).isin(oklahoma_prefixes) |
+    zips_all_centroids['ZCTA5'].astype(int).isin(arkansas_prefixes) |
+    zips_all_centroids['ZCTA5'].astype(int).isin(louisiana_prefixes)
+]
 
 # Count unique ZIP codes in each subset
 texas_unique_zips = zips_texas_centroids['ZCTA5'].nunique()
-new_mexico_unique_zips = zips_new_mexico_centroids['ZCTA5'].nunique()
+borderstates_unique_zips = zips_texas_borderstates_centroids['ZCTA5'].nunique()
 
 print(f"Number of unique ZIP codes in Texas: {texas_unique_zips}")
-print(f"Number of unique ZIP codes in New Mexico: {new_mexico_unique_zips}")
+print(f"Number of unique ZIP codes in Texas and bordering states: {borderstates_unique_zips}")
 
 ```
 
 Number of unique ZIP codes in Texas: 1935
-Number of unique ZIP codes in New Mexico: 368
+Number of unique ZIP codes in Texas and bordering states: 3992
 
 3. 
 
 ```{python}
 
+# Step 1: Group the 2016 hospital data by ZIP code to get the count of hospitals in each ZIP
+hospital_counts_2016 = pos2016.groupby('ZIP_CD').size().reset_index(name='hospital_count')
+
+# Step 2: Filter to keep only ZIP codes with at least 1 hospital
+hospital_counts_2016 = hospital_counts_2016[hospital_counts_2016['hospital_count'] > 0]
+
+# Step 3: Convert ZCTA5 and ZIP_CD to integers to ensure compatibility for merging
+zips_texas_borderstates_centroids['ZCTA5'] = zips_texas_borderstates_centroids['ZCTA5'].astype(int)
+hospital_counts_2016['ZIP_CD'] = hospital_counts_2016['ZIP_CD'].astype(int)
+
+# Step 4: Perform the inner merge to create zips_withhospital_centroids
+zips_withhospital_centroids = zips_texas_borderstates_centroids.merge(
+    hospital_counts_2016, left_on='ZCTA5', right_on='ZIP_CD', how='inner'
+)
+
+# Display the first few rows of the result
+print(zips_withhospital_centroids.head())
+
 
 ```
 
 
+
+We are using an inner merge to retain only rows that exist in both zips_texas_borderstates_centroids (Texas and bordering state ZIP code centroids) and hospital_counts_2016 (ZIP codes with at least one hospital in 2016), 
+ensuring the final GeoDataFrame, zips_withhospital_centroids, contains only relevant ZIP codes with hospitals. The merge is performed on the ZIP code columns: ZCTA5 from zips_texas_borderstates_centroids and ZIP_CD from hospital_counts_2016.
+
+
 4. 
+
     a.
+
+```{python}
+import time
+from shapely.ops import nearest_points
+
+# Subset 10 ZIP codes from zips_texas_centroids
+zips_texas_sample = zips_texas_centroids.head(10)
+
+# Start timing
+start_time = time.time()
+
+# Calculate the nearest ZIP code in zips_withhospital_centroids for each in the sample
+distances = []
+for _, texas_zip in zips_texas_sample.iterrows():
+    # Find the nearest point in zips_withhospital_centroids
+    nearest_hospital = zips_withhospital_centroids.distance(texas_zip.geometry).idxmin()
+    nearest_distance = texas_zip.geometry.distance(zips_withhospital_centroids.loc[nearest_hospital, 'geometry'])
+    distances.append(nearest_distance)
+
+# End timing
+end_time = time.time()
+
+# Calculate elapsed time
+elapsed_time = end_time - start_time
+
+# Estimate for entire dataset
+sample_size = len(zips_texas_sample)
+total_size = len(zips_texas_centroids)
+estimated_total_time = (elapsed_time / sample_size) * total_size
+
+# Display results
+print(f"Time taken for 10 ZIP codes: {elapsed_time:.2f} seconds")
+print(f"Estimated time for entire join: {estimated_total_time:.2f} seconds")
+
+```
+
+Time taken for 10 ZIP codes: 0.25 seconds
+Estimated time for entire join: 47.69 seconds
     b.
-5. 
-    a.
-    b.
+
+```{python}
+
+import geopandas as gpd
+import time
+
+# Reproject both GeoDataFrames to EPSG:3857 (meters)
+zips_texas_centroids = zips_texas_centroids.to_crs(epsg=3857)
+zips_withhospital_centroids = zips_withhospital_centroids.to_crs(epsg=3857)
+
+# Start timing for full calculation
+start_time_full = time.time()
+
+# Calculate nearest ZIP code with a hospital for each ZIP in zips_texas_centroids
+full_distances = []
+for _, texas_zip in zips_texas_centroids.iterrows():
+    # Find the nearest point in zips_withhospital_centroids
+    nearest_hospital = zips_withhospital_centroids.distance(texas_zip.geometry).idxmin()
+    nearest_distance = texas_zip.geometry.distance(zips_withhospital_centroids.loc[nearest_hospital, 'geometry'])
+    full_distances.append(nearest_distance)
+
+# End timing for full calculation
+end_time_full = time.time()
+
+# Calculate and display the actual time taken
+actual_full_time = end_time_full - start_time_full
+print(f"Actual time taken for full calculation: {actual_full_time:.2f} seconds")
+
+```
+
+Actual time taken for full calculation: 2.78 seconds
+
     c.
+
+```{python}
+
+# Define conversion factor for meters to miles
+meters_to_miles = 0.000621371
+
+# Reproject both GeoDataFrames to EPSG:3857 for accurate distance calculations in meters
+zips_texas_centroids = zips_texas_centroids.to_crs(epsg=3857)
+zips_withhospital_centroids = zips_withhospital_centroids.to_crs(epsg=3857)
+
+# Start timing for the full calculation
+start_time_full = time.time()
+
+# Calculate nearest ZIP code with a hospital for each ZIP in zips_texas_centroids
+distances_in_miles = []
+for _, texas_zip in zips_texas_centroids.iterrows():
+    # Find the nearest hospital and calculate the distance in meters
+    nearest_hospital = zips_withhospital_centroids.distance(texas_zip.geometry).idxmin()
+    nearest_distance_meters = texas_zip.geometry.distance(zips_withhospital_centroids.loc[nearest_hospital, 'geometry'])
+    
+    # Convert the distance from meters to miles and store it
+    nearest_distance_miles = nearest_distance_meters * meters_to_miles
+    distances_in_miles.append(nearest_distance_miles)
+
+# End timing for the full calculation
+end_time_full = time.time()
+
+# Display the calculated distances (first 10 as a sample)
+print("Distances in miles (sample):", distances_in_miles[:10])
+
+# Print the actual time taken
+actual_full_time = end_time_full - start_time_full
+print(f"Actual time taken for full calculation: {actual_full_time:.2f} seconds")
+
+
+```
+
+
+
+5. 
+
+```{python}
+```
+
+    a.
+
+```{python}
+
+# Define conversion factor for meters to miles
+meters_to_miles = 0.000621371
+
+# Reproject both GeoDataFrames to EPSG:3857 for accurate distance calculations in meters
+zips_texas_centroids = zips_texas_centroids.to_crs(epsg=3857)
+zips_withhospital_centroids = zips_withhospital_centroids.to_crs(epsg=3857)
+
+# Calculate nearest ZIP code with a hospital for each ZIP in zips_texas_centroids
+distances_in_miles = []
+for _, texas_zip in zips_texas_centroids.iterrows():
+    # Find the nearest hospital and calculate the distance in meters
+    nearest_hospital = zips_withhospital_centroids.distance(texas_zip.geometry).idxmin()
+    nearest_distance_meters = texas_zip.geometry.distance(zips_withhospital_centroids.loc[nearest_hospital, 'geometry'])
+    
+    # Convert the distance from meters to miles and store it
+    nearest_distance_miles = nearest_distance_meters * meters_to_miles
+    distances_in_miles.append(nearest_distance_miles)
+
+# Calculate and display the average distance
+average_distance = sum(distances_in_miles) / len(distances_in_miles)
+print(f"Average distance to the nearest hospital for Texas ZIP codes: {average_distance:.2f} miles")
+
+
+```
+
+This is done in miles.
+
+    b.
+
+Average distance to the nearest hospital for Texas ZIP codes: 4.55 miles
+
+    c.
+
+```{python}
+
+import geopandas as gpd
+import matplotlib.pyplot as plt
+
+# Define conversion factor for meters to miles
+meters_to_miles = 0.000621371
+
+# Reproject both GeoDataFrames to EPSG:3857 for accurate distance calculations in meters
+zips_texas_centroids = zips_texas_centroids.to_crs(epsg=3857)
+zips_withhospital_centroids = zips_withhospital_centroids.to_crs(epsg=3857)
+
+# Calculate nearest ZIP code with a hospital for each ZIP in zips_texas_centroids
+distances_in_miles = []
+for _, texas_zip in zips_texas_centroids.iterrows():
+    # Find the nearest hospital and calculate the distance in meters
+    nearest_hospital = zips_withhospital_centroids.distance(texas_zip.geometry).idxmin()
+    nearest_distance_meters = texas_zip.geometry.distance(zips_withhospital_centroids.loc[nearest_hospital, 'geometry'])
+    
+    # Convert the distance from meters to miles and store it
+    nearest_distance_miles = nearest_distance_meters * meters_to_miles
+    distances_in_miles.append(nearest_distance_miles)
+
+# Add distances to the GeoDataFrame as a new column
+zips_texas_centroids['distance_to_hospital_miles'] = distances_in_miles
+
+# Plot the map
+fig, ax = plt.subplots(1, 1, figsize=(10, 10))
+zips_texas_centroids.plot(column='distance_to_hospital_miles', cmap='OrRd', linewidth=0.8, ax=ax, edgecolor='0.8', legend=True)
+ax.set_title("Distance to Nearest Hospital for Texas ZIP Codes (in miles)")
+ax.set_axis_off()
+plt.show()
+
+```
     
 ## Effects of closures on access in Texas (15 pts)
 
