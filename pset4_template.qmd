@@ -146,21 +146,19 @@ They are exactly the same number, meaning each row is a unique hospital.
 
 years = ["2016", "2017", "2018", "2019"]
 
-# Load data for each year and filter for short-term hospitals
 data = {}
 for year in years:
     file_path = os.path.join(path, f"pos{year}.csv")
-    # Specify encoding
+    
     df = pd.read_csv(file_path, encoding='ISO-8859-1')
     data[year] = df[(df["PRVDR_CTGRY_CD"] == 1) & (df["PRVDR_CTGRY_SBTYP_CD"] == 1)]
 
-# Identify closures
 closures = []
 for i, year in enumerate(years[:-1]):
     current_year_data = data[year]
     next_year_data = data[years[i + 1]]
     
-    # Merge to check if hospitals from the current year exist in the next year
+    
     merged_data = current_year_data.merge(
         next_year_data[['PRVDR_NUM']],
         on='PRVDR_NUM',
@@ -168,18 +166,17 @@ for i, year in enumerate(years[:-1]):
         indicator=True
     )
     
-    # Filter for hospitals that do not appear in the next year's data or have a termination date
+    
     closed_hospitals = merged_data[
         (merged_data['_merge'] == 'left_only') |
         (merged_data['TRMNTN_EXPRTN_DT'].notna())
     ]
     
-    # Store closures with hospital name, zip, and year of closure
+    
     closures.extend(
         closed_hospitals[['FAC_NAME', 'ZIP_CD', 'PRVDR_NUM']].assign(Year_Closed=years[i + 1]).to_dict('records')
     )
 
-# Convert closures to DataFrame for easy viewing
 closures_df = pd.DataFrame(closures)
 print(f"Total suspected closures: {len(closures_df)}")
 print(closures_df)
@@ -189,13 +186,12 @@ print(closures_df)
 The total suspected closure amount is 11606 hospitals.
 2. 
 ```{python}
-# Sort closures_df by facility name and select the first 10 rows
+
 sorted_closures = closures_df.sort_values(by='FAC_NAME').head(10)
 
-# Display the facility names and years of suspected closure for the first 10 rows
+
 sorted_closures[['FAC_NAME', 'Year_Closed']]
 
-# Display facility names and years of suspected closure for the first 10 sorted rows
 print(sorted_closures[['FAC_NAME', 'Year_Closed']])
 
 ```
@@ -216,37 +212,35 @@ print(sorted_closures[['FAC_NAME', 'Year_Closed']])
 3. 
     a.
 ```{python}
-# Step 1: Count active hospitals by ZIP code for each year
+
 active_hospitals_by_zip = {}
 for year, df in data.items():
-    # Filter active hospitals (no termination date) and count by ZIP code
+    
     active_by_zip = df[df['TRMNTN_EXPRTN_DT'].isna()].groupby('ZIP_CD')['PRVDR_NUM'].count()
     active_hospitals_by_zip[year] = active_by_zip
 
-# Step 2: Identify potential mergers/acquisitions
 potential_mergers = []
 for _, row in closures_df.iterrows():
     zip_code = row['ZIP_CD']
     closure_year = row['Year_Closed']
     
-    # Convert closure_year to string to match dictionary keys
     closure_year_str = str(closure_year)
     next_year_str = str(int(closure_year) + 1)
     
-    # Check if we have counts for both the closure year and the following year
+    
     if closure_year_str in active_hospitals_by_zip and next_year_str in active_hospitals_by_zip:
-        # Compare hospital counts in the ZIP code for closure year and the next year
+        
         current_count = active_hospitals_by_zip[closure_year_str].get(zip_code, 0)
         next_count = active_hospitals_by_zip[next_year_str].get(zip_code, 0)
         
-        # If the number of hospitals does not decrease, it may indicate a merger/acquisition
+        
         if current_count == next_count:
             potential_mergers.append(row)
 
-# Convert potential mergers to DataFrame
+
 potential_mergers_df = pd.DataFrame(potential_mergers)
 
-# Output the number of potential mergers/acquisitions
+
 print(f"Number of suspected closures that may be mergers/acquisitions: {len(potential_mergers_df)}")
 print(potential_mergers_df[['FAC_NAME', 'ZIP_CD', 'Year_Closed']])
 
@@ -255,37 +249,37 @@ print(potential_mergers_df[['FAC_NAME', 'ZIP_CD', 'Year_Closed']])
 Number of suspected closures that may be mergers/acquisitions: 7625
     b.
 ```{python}
-# Step 1: Count active hospitals by ZIP code for each year
+
 active_hospitals_by_zip = {}
 for year, df in data.items():
-    # Filter active hospitals (no termination date) and count by ZIP code
+    
     active_by_zip = df[df['TRMNTN_EXPRTN_DT'].isna()].groupby('ZIP_CD')['PRVDR_NUM'].count()
     active_hospitals_by_zip[year] = active_by_zip
 
-# Step 2: Filter closures based on active hospital count in ZIP code
+
 filtered_closures = []
 for _, row in closures_df.iterrows():
     zip_code = row['ZIP_CD']
     closure_year = row['Year_Closed']
     
-    # Convert closure_year to string to match dictionary keys
+    
     closure_year_str = str(closure_year)
     next_year_str = str(int(closure_year) + 1)
     
-    # Check if we have counts for both the closure year and the following year
+    
     if closure_year_str in active_hospitals_by_zip and next_year_str in active_hospitals_by_zip:
-        # Compare hospital counts in the ZIP code for closure year and the next year
+        
         current_count = active_hospitals_by_zip[closure_year_str].get(zip_code, 0)
         next_count = active_hospitals_by_zip[next_year_str].get(zip_code, 0)
         
-        # Keep only if active hospitals decrease in the following year
+        
         if current_count > next_count:
             filtered_closures.append(row)
 
-# Convert filtered closures to DataFrame
+
 filtered_closures_df = pd.DataFrame(filtered_closures)
 
-# Display the filtered list of suspected closures
+
 print(f"Total filtered suspected closures: {len(filtered_closures_df)}")
 print(filtered_closures_df[['FAC_NAME', 'ZIP_CD', 'Year_Closed']])
 
@@ -298,10 +292,10 @@ Total filtered suspected closures: 42
     c.
 ```{python}
 
-# Sort the filtered closures by hospital name
+
 sorted_filtered_closures = filtered_closures_df.sort_values(by='FAC_NAME').head(10)
 
-# Display the first 10 rows of the sorted list
+
 print(sorted_filtered_closures[['FAC_NAME', 'ZIP_CD', 'Year_Closed']])
 
 
@@ -332,11 +326,11 @@ print(sorted_filtered_closures[['FAC_NAME', 'ZIP_CD', 'Year_Closed']])
 ```{python}
 import zipfile
 
-# Set the path to the ZIP file and the output directory
+
 zip_path = "C:\\Users\\madig\\Documents\\Github\\Year 2024-2025\\problem-set-4-gena-ting\\gz_2010_us_860_00_500k.zip"
 extract_path = "C:\\Users\\madig\\Documents\\Github\\Year 2024-2025\\problem-set-4-gena-ting"
 
-# Unzip the file
+
 with zipfile.ZipFile(zip_path, 'r') as zip_ref:
     zip_ref.extractall(extract_path)
 
@@ -350,16 +344,16 @@ print("Shapefile unzipped successfully!")
 ```{python}
 import geopandas as gpd
 
-# Set the path to the national shapefile and rename as filepath2
+
 filepath2 = "C:\\Users\\madig\\Documents\\Github\\Year 2024-2025\\problem-set-4-gena-ting\\gz_2010_us_860_00_500k.shp"
 
 zips_all = gpd.read_file(filepath2)
 
-# Calculate centroids for each ZIP code
+
 zips_all_centroids = zips_all.copy()
 zips_all_centroids['geometry'] = zips_all_centroids.centroid
 
-# Check the dimensions and column information
+
 print("Dimensions of zips_all_centroids:", zips_all_centroids.shape)
 print("Columns and first few rows of zips_all_centroids:")
 print(zips_all_centroids.head())
@@ -385,19 +379,19 @@ geometry: A Point geometry representing the centroid location of each ZIP code a
 
 ```{python}
 
+import time
+from shapely.ops import nearest_points
 import geopandas as gpd
+import time
 
-# Define ZIP code ranges for each state
-texas_prefixes = list(range(75001, 80000)) + [73301]  # Texas ZIP code range
-new_mexico_prefixes = range(87001, 88500)             # New Mexico ZIP code range
-oklahoma_prefixes = range(73001, 74900)               # Oklahoma ZIP code range
-arkansas_prefixes = range(71601, 72900)               # Arkansas ZIP code range
-louisiana_prefixes = range(70001, 71500)              # Louisiana ZIP code range
+texas_prefixes = list(range(75001, 80000)) + [73301]  
+new_mexico_prefixes = range(87001, 88500)             
+oklahoma_prefixes = range(73001, 74900)               
+arkansas_prefixes = range(71601, 72900)               
+louisiana_prefixes = range(70001, 71500)              
 
-# Filter for Texas ZIP codes
 zips_texas_centroids = zips_all_centroids[zips_all_centroids['ZCTA5'].astype(int).isin(texas_prefixes)]
 
-# Filter for Texas and bordering states ZIP codes
 zips_texas_borderstates_centroids = zips_all_centroids[
     zips_all_centroids['ZCTA5'].astype(int).isin(texas_prefixes) |
     zips_all_centroids['ZCTA5'].astype(int).isin(new_mexico_prefixes) |
@@ -406,7 +400,6 @@ zips_texas_borderstates_centroids = zips_all_centroids[
     zips_all_centroids['ZCTA5'].astype(int).isin(louisiana_prefixes)
 ]
 
-# Count unique ZIP codes in each subset
 texas_unique_zips = zips_texas_centroids['ZCTA5'].nunique()
 borderstates_unique_zips = zips_texas_borderstates_centroids['ZCTA5'].nunique()
 
@@ -422,22 +415,17 @@ Number of unique ZIP codes in Texas and bordering states: 3992
 
 ```{python}
 
-# Step 1: Group the 2016 hospital data by ZIP code to get the count of hospitals in each ZIP
 hospital_counts_2016 = pos2016.groupby('ZIP_CD').size().reset_index(name='hospital_count')
 
-# Step 2: Filter to keep only ZIP codes with at least 1 hospital
 hospital_counts_2016 = hospital_counts_2016[hospital_counts_2016['hospital_count'] > 0]
 
-# Step 3: Convert ZCTA5 and ZIP_CD to integers to ensure compatibility for merging
 zips_texas_borderstates_centroids['ZCTA5'] = zips_texas_borderstates_centroids['ZCTA5'].astype(int)
 hospital_counts_2016['ZIP_CD'] = hospital_counts_2016['ZIP_CD'].astype(int)
 
-# Step 4: Perform the inner merge to create zips_withhospital_centroids
 zips_withhospital_centroids = zips_texas_borderstates_centroids.merge(
     hospital_counts_2016, left_on='ZCTA5', right_on='ZIP_CD', how='inner'
 )
 
-# Display the first few rows of the result
 print(zips_withhospital_centroids.head())
 
 
@@ -454,35 +442,26 @@ ensuring the final GeoDataFrame, zips_withhospital_centroids, contains only rele
     a.
 
 ```{python}
-import time
-from shapely.ops import nearest_points
 
-# Subset 10 ZIP codes from zips_texas_centroids
 zips_texas_sample = zips_texas_centroids.head(10)
 
-# Start timing
 start_time = time.time()
 
-# Calculate the nearest ZIP code in zips_withhospital_centroids for each in the sample
 distances = []
 for _, texas_zip in zips_texas_sample.iterrows():
-    # Find the nearest point in zips_withhospital_centroids
+    
     nearest_hospital = zips_withhospital_centroids.distance(texas_zip.geometry).idxmin()
     nearest_distance = texas_zip.geometry.distance(zips_withhospital_centroids.loc[nearest_hospital, 'geometry'])
     distances.append(nearest_distance)
 
-# End timing
 end_time = time.time()
 
-# Calculate elapsed time
 elapsed_time = end_time - start_time
 
-# Estimate for entire dataset
 sample_size = len(zips_texas_sample)
 total_size = len(zips_texas_centroids)
 estimated_total_time = (elapsed_time / sample_size) * total_size
 
-# Display results
 print(f"Time taken for 10 ZIP codes: {elapsed_time:.2f} seconds")
 print(f"Estimated time for entire join: {estimated_total_time:.2f} seconds")
 
@@ -494,28 +473,20 @@ Estimated time for entire join: 47.69 seconds
 
 ```{python}
 
-import geopandas as gpd
-import time
-
-# Reproject both GeoDataFrames to EPSG:3857 (meters)
 zips_texas_centroids = zips_texas_centroids.to_crs(epsg=3857)
 zips_withhospital_centroids = zips_withhospital_centroids.to_crs(epsg=3857)
 
-# Start timing for full calculation
 start_time_full = time.time()
 
-# Calculate nearest ZIP code with a hospital for each ZIP in zips_texas_centroids
 full_distances = []
 for _, texas_zip in zips_texas_centroids.iterrows():
-    # Find the nearest point in zips_withhospital_centroids
+
     nearest_hospital = zips_withhospital_centroids.distance(texas_zip.geometry).idxmin()
     nearest_distance = texas_zip.geometry.distance(zips_withhospital_centroids.loc[nearest_hospital, 'geometry'])
     full_distances.append(nearest_distance)
 
-# End timing for full calculation
 end_time_full = time.time()
 
-# Calculate and display the actual time taken
 actual_full_time = end_time_full - start_time_full
 print(f"Actual time taken for full calculation: {actual_full_time:.2f} seconds")
 
@@ -527,34 +498,33 @@ Actual time taken for full calculation: 2.78 seconds
 
 ```{python}
 
-# Define conversion factor for meters to miles
 meters_to_miles = 0.000621371
 
-# Reproject both GeoDataFrames to EPSG:3857 for accurate distance calculations in meters
+
 zips_texas_centroids = zips_texas_centroids.to_crs(epsg=3857)
 zips_withhospital_centroids = zips_withhospital_centroids.to_crs(epsg=3857)
 
-# Start timing for the full calculation
+
 start_time_full = time.time()
 
-# Calculate nearest ZIP code with a hospital for each ZIP in zips_texas_centroids
+
 distances_in_miles = []
 for _, texas_zip in zips_texas_centroids.iterrows():
-    # Find the nearest hospital and calculate the distance in meters
+    
     nearest_hospital = zips_withhospital_centroids.distance(texas_zip.geometry).idxmin()
     nearest_distance_meters = texas_zip.geometry.distance(zips_withhospital_centroids.loc[nearest_hospital, 'geometry'])
     
-    # Convert the distance from meters to miles and store it
+    
     nearest_distance_miles = nearest_distance_meters * meters_to_miles
     distances_in_miles.append(nearest_distance_miles)
 
-# End timing for the full calculation
+
 end_time_full = time.time()
 
-# Display the calculated distances (first 10 as a sample)
+
 print("Distances in miles (sample):", distances_in_miles[:10])
 
-# Print the actual time taken
+
 actual_full_time = end_time_full - start_time_full
 print(f"Actual time taken for full calculation: {actual_full_time:.2f} seconds")
 
@@ -572,25 +542,25 @@ print(f"Actual time taken for full calculation: {actual_full_time:.2f} seconds")
 
 ```{python}
 
-# Define conversion factor for meters to miles
+
 meters_to_miles = 0.000621371
 
-# Reproject both GeoDataFrames to EPSG:3857 for accurate distance calculations in meters
+
 zips_texas_centroids = zips_texas_centroids.to_crs(epsg=3857)
 zips_withhospital_centroids = zips_withhospital_centroids.to_crs(epsg=3857)
 
-# Calculate nearest ZIP code with a hospital for each ZIP in zips_texas_centroids
+
 distances_in_miles = []
 for _, texas_zip in zips_texas_centroids.iterrows():
-    # Find the nearest hospital and calculate the distance in meters
+    
     nearest_hospital = zips_withhospital_centroids.distance(texas_zip.geometry).idxmin()
     nearest_distance_meters = texas_zip.geometry.distance(zips_withhospital_centroids.loc[nearest_hospital, 'geometry'])
     
-    # Convert the distance from meters to miles and store it
+    
     nearest_distance_miles = nearest_distance_meters * meters_to_miles
     distances_in_miles.append(nearest_distance_miles)
 
-# Calculate and display the average distance
+
 average_distance = sum(distances_in_miles) / len(distances_in_miles)
 print(f"Average distance to the nearest hospital for Texas ZIP codes: {average_distance:.2f} miles")
 
@@ -610,28 +580,25 @@ Average distance to the nearest hospital for Texas ZIP codes: 4.55 miles
 import geopandas as gpd
 import matplotlib.pyplot as plt
 
-# Define conversion factor for meters to miles
+
 meters_to_miles = 0.000621371
 
-# Reproject both GeoDataFrames to EPSG:3857 for accurate distance calculations in meters
+
 zips_texas_centroids = zips_texas_centroids.to_crs(epsg=3857)
 zips_withhospital_centroids = zips_withhospital_centroids.to_crs(epsg=3857)
 
-# Calculate nearest ZIP code with a hospital for each ZIP in zips_texas_centroids
+
 distances_in_miles = []
 for _, texas_zip in zips_texas_centroids.iterrows():
-    # Find the nearest hospital and calculate the distance in meters
+    
     nearest_hospital = zips_withhospital_centroids.distance(texas_zip.geometry).idxmin()
     nearest_distance_meters = texas_zip.geometry.distance(zips_withhospital_centroids.loc[nearest_hospital, 'geometry'])
     
-    # Convert the distance from meters to miles and store it
     nearest_distance_miles = nearest_distance_meters * meters_to_miles
     distances_in_miles.append(nearest_distance_miles)
 
-# Add distances to the GeoDataFrame as a new column
 zips_texas_centroids['distance_to_hospital_miles'] = distances_in_miles
 
-# Plot the map
 fig, ax = plt.subplots(1, 1, figsize=(10, 10))
 zips_texas_centroids.plot(column='distance_to_hospital_miles', cmap='OrRd', linewidth=0.8, ax=ax, edgecolor='0.8', legend=True)
 ax.set_title("Distance to Nearest Hospital for Texas ZIP Codes (in miles)")
