@@ -336,3 +336,7 @@ plt.show()
 
 
 ## Reflecting on the exercise (10 pts) 
+1.
+	Currently, we identify real closures by comparing the number of active hospitals. However, this approach has a potential issue: we might mistakenly identify a genuine closure as a merger if the total number remains unchanged. This could lead to misclassifying a true closure as a merger.
+
+	To improve this method, we could add a classification for operational closures. Instead of simply labeling them as “terminated,” an additional column indicating operational closure status would make it easier to verify the true nature of each hospital’s closure.
