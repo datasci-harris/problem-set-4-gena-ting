@@ -384,7 +384,9 @@ from shapely.ops import nearest_points
 import geopandas as gpd
 import time
 
-texas_prefixes = list(range(75001, 80000)) + [73301]  
+
+texas_prefixes = list(range(75001, 80000)) + list(range(88510, 88596)) + [73301, 73960, 73344]
+
 new_mexico_prefixes = range(87001, 88500)             
 oklahoma_prefixes = range(73001, 74900)               
 arkansas_prefixes = range(71601, 72900)               
@@ -615,3 +617,20 @@ plt.show()
 4. 
 
 ## Reflecting on the exercise (10 pts) 
+1.
+
+2. Consider the way we are identifying zip codes affected by closures. How
+
+
+The current method of identifying affected ZIP codes based on closures captures a basic 
+impact on access but may oversimplify the actual effects on healthcare accessibility.
+
+Such as, not all hospitals offer the same level of care or capacity. 
+Identifying closures without distinguishing by service type or patient 
+capacity might overlook the specific impact on healthcare access. 
+Moreover, zip codes can vary widely in population density and demographics. 
+A closure in a densely populated or medically underserved area has a 
+different impact than one in a well-served area. 
+
+Including factors like hospital capacity or population characteristics, 
+such as density or income, would provide a more accurate measure of affected access.
